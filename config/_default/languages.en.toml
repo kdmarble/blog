@@ -12,6 +12,6 @@ title = "kmarble.dev"
   headline = ""
   bio = ""
   links = [
-    { email = "mailto:hello@kmarble.dev" },
+    { email = "mailto:admin@kmarble.dev" },
     { github = "https://github.com/kdmarble" },
   ]
