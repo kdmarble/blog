@@ -7,4 +7,4 @@ showTableOfContents: false
 showComments: false
 ---
 
-Keith (they/them) in Chicago — homelab tinkerer, AI pragmatist, writer with a stubborn human-in-the-loop streak. Say hi at [admin@kmarble.dev](mailto:admin@kmarble.dev).
+Key (aka Keith) (they/them) in Chicago — homelab tinkerer, AI pragmatist, writer with a stubborn human-in-the-loop streak. Say hi at [admin@kmarble.dev](mailto:admin@kmarble.dev).
