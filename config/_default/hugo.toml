@@ -1,0 +1,37 @@
+baseURL = "https://kmarble.dev/"
+defaultContentLanguage = "en"
+
+enableRobotsTXT = true
+enableEmoji = true
+enableGitInfo = true
+
+summaryLength = 0
+
+[pagination]
+  pagerSize = 10
+
+[outputs]
+  home = ["HTML", "RSS", "JSON"]
+
+[sitemap]
+  changefreq = "weekly"
+  priority = 0.5
+  filename = "sitemap.xml"
+
+[imaging]
+  resampleFilter = "CatmullRom"
+  quality = 75
+  anchor = "smart"
+
+[taxonomies]
+  tag = "tags"
+  category = "categories"
+  series = "series"
+
+[permalinks]
+  posts = "/posts/:slug"
+
+[caches]
+  [caches.images]
+    dir = ":resourceDir/_gen"
+    maxAge = -1

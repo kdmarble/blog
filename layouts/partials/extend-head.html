@@ -1,0 +1,6 @@
+{{- /* Umami analytics — activates when both websiteid and domain are set under [umami] in params.toml */ -}}
+{{- with site.Params.umami -}}
+  {{- if and .websiteid .domain -}}
+<script defer src="https://{{ .domain }}/script.js" data-website-id="{{ .websiteid }}"></script>
+  {{- end -}}
+{{- end -}}

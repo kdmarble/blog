@@ -1,0 +1,17 @@
+languageCode = "en"
+languageName = "English"
+weight = 1
+title = "kmarble.dev"
+
+[params]
+  description = ""
+
+[author]
+  name = "Key"
+  image = ""
+  headline = ""
+  bio = ""
+  links = [
+    { email = "mailto:hello@kmarble.dev" },
+    { github = "https://github.com/kdmarble" },
+  ]

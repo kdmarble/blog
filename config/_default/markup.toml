@@ -1,0 +1,17 @@
+[goldmark]
+  [goldmark.renderer]
+    unsafe = true
+
+[highlight]
+  noClasses = false
+  codeFences = true
+  guessSyntax = false
+  lineNos = false
+  lineNumbersInTable = true
+  style = "catppuccin-mocha"
+  tabWidth = 2
+
+[tableOfContents]
+  endLevel = 4
+  ordered = false
+  startLevel = 2
