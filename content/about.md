@@ -7,4 +7,4 @@ showTableOfContents: false
 showComments: false
 ---
 
-TODO: write about page.
+Key (they/them) in Chicago — homelab tinkerer, AI pragmatist, writer with a stubborn human-in-the-loop streak. Say hi at [hello@kmarble.dev](mailto:hello@kmarble.dev).
