@@ -57,7 +57,6 @@ disableTextInHeader = false
 [taxonomy]
   showTermCount = true
 
-# Analytics placeholder — fill in once Umami is deployed
-# [umami]
-#   websiteid = ""
-#   domain = "analytics.stinkiejet.club"
+[umami]
+  websiteid = "e799341b-22d9-4957-abb7-9d68229b9201"
+  domain = "analytics.stinkiejet.club"
