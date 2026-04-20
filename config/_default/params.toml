@@ -9,6 +9,9 @@ mainSections = ["posts"]
 disableImageOptimization = false
 disableTextInHeader = false
 
+# Default OG image for social previews (per-post override via frontmatter `images:`)
+images = ["og-image.png"]
+
 [header]
   layout = "basic"
 
