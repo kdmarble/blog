@@ -1,5 +1,6 @@
 ---
 title: "Strix Halo LLM Serving: 25 tok/s at 151k Context Under 100W"
+slug: "strix-halo-llm-inference-show-and-tell"
 date: 2026-04-26
 draft: false
 tags: ["ai", "homelab", "llm-inference", "strix-halo", "llama-cpp", "qwen", "local-ai"]
@@ -7,15 +8,12 @@ tags: ["ai", "homelab", "llm-inference", "strix-halo", "llama-cpp", "qwen", "loc
 
 I have been tuning this box for my own daily agent/chat workflow, extensively, over the course of a month or so. I think I'm finally dialing things in to a very useful baseline, but I'd love to hear from others that are getting better perf. I really think we're hitting the "good enough" stage of local AI, in that the models we have available, their capabilities, and open source harness options, all mean you can reach for local AI _first_. Now, you really only need to reach for cloud models for seriously complex stuff. Hope others find this useful!
 
-<video
-  controls
-  preload="metadata"
-  poster="/artifacts/strix-halo-llm-inference-loading/strix-halo-llm-inference-screencast-poster.jpg"
-  style="width: 100%; border: 1px solid #2a2a4a; border-radius: 8px; background: #0a0a1a;"
->
-  <source src="https://assets.kmarble.dev/artifacts/strix-halo-llm-inference-loading/strix-halo-llm-inference-screencast-2026-04-26.webm" type="video/webm">
-  <a href="https://assets.kmarble.dev/artifacts/strix-halo-llm-inference-loading/strix-halo-llm-inference-screencast-2026-04-26.webm">Open the screencast</a>
+<div>
+<video controls preload="metadata" poster="/artifacts/strix-halo-llm-inference-loading/strix-halo-llm-inference-screencast-poster.jpg" style="width: 100%; border: 1px solid #2a2a4a; border-radius: 8px; background: #0a0a1a;">
+<source src="https://assets.kmarble.dev/artifacts/strix-halo-llm-inference-loading/strix-halo-llm-inference-screencast-2026-04-26.webm" type="video/webm">
+<a href="https://assets.kmarble.dev/artifacts/strix-halo-llm-inference-loading/strix-halo-llm-inference-screencast-2026-04-26.webm">Open the screencast</a>
 </video>
+</div>
 
 ---
 
@@ -33,12 +31,7 @@ I also packaged the loading and quantization visuals as a standalone artifact. Y
   <a href="https://assets.kmarble.dev/downloads/strix-halo-llm-inference-loading-2026-04-26.zip">Download the standalone package</a>
 </p>
 
-<iframe
-  src="/artifacts/strix-halo-llm-inference-loading/"
-  title="Strix Halo LLM inference loading and quantization visuals"
-  loading="lazy"
-  style="width: 100%; height: 760px; max-height: 82vh; border: 1px solid #2a2a4a; border-radius: 8px; background: #0a0a1a;"
-></iframe>
+<iframe src="/artifacts/strix-halo-llm-inference-loading/" title="Strix Halo LLM inference loading and quantization visuals" loading="lazy" style="width: 100%; height: 760px; max-height: 82vh; border: 1px solid #2a2a4a; border-radius: 8px; background: #0a0a1a;"></iframe>
 
 ## The live setup
 
