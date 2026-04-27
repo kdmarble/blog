@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Strix Halo LLM Inference: Loading & Quantization</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a1a;
+      color: #e0e0e0;
+      line-height: 1.6;
+    }
+    .container { max-width: 1000px; margin: 0 auto; padding: 40px 20px; }
+    h1 { font-size: 28px; margin-bottom: 8px; color: #fff; }
+    .subtitle { color: #888; margin-bottom: 30px; font-size: 14px; }
+    .video-info {
+      background: #141428;
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+    .video-info a { color: #6cb4ee; text-decoration: none; }
+    .video-info a:hover { text-decoration: underline; }
+    .video-info .meta { color: #666; font-size: 13px; margin-top: 8px; }
+    .setup-info {
+      background: #101024;
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+    .setup-info h2 { font-size: 18px; color: #fff; margin-bottom: 12px; }
+    .setup-info p { color: #b8b8c8; font-size: 14px; margin-bottom: 14px; }
+    .setup-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 10px;
+      margin: 14px 0;
+    }
+    .setup-stat {
+      background: #17172d;
+      border: 1px solid #252548;
+      border-radius: 6px;
+      padding: 10px 12px;
+    }
+    .setup-stat span {
+      display: block;
+      color: #777;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .setup-stat strong {
+      display: block;
+      color: #f0f0f5;
+      font-size: 14px;
+      margin-top: 2px;
+    }
+    pre {
+      overflow-x: auto;
+      background: #090916;
+      border: 1px solid #242444;
+      border-radius: 6px;
+      padding: 12px;
+      color: #cbd5e1;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .screencast-video {
+      display: block;
+      width: 100%;
+      border: 1px solid #242444;
+      border-radius: 6px;
+      background: #050510;
+      margin-top: 12px;
+    }
+    .sketch {
+      background: #141428;
+      border: 1px solid #2a2a4a;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .sketch-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #2a2a4a;
+    }
+    .sketch-header h2 { font-size: 18px; color: #fff; margin-bottom: 4px; }
+    .sketch-header p { color: #888; font-size: 13px; }
+    .sketch-header .timestamp { color: #555; font-size: 12px; }
+    .sketch-embed {
+      width: 100%;
+      aspect-ratio: 12 / 7;
+      height: auto;
+      border: none;
+      background: #0a0a1a;
+    }
+    .sketch-footer {
+      padding: 12px 20px;
+      border-top: 1px solid #2a2a4a;
+      font-size: 12px;
+      color: #555;
+    }
+    .key-hints { color: #444; }
+    .key-hints kbd {
+      background: #1a1a2e;
+      border: 1px solid #333;
+      border-radius: 3px;
+      padding: 1px 6px;
+      font-family: monospace;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Strix Halo LLM Inference: Loading & Quantization</h1>
+  <p class="subtitle">Shareable visual notes for the running Qwen3.6-35B-A3B homelab setup.</p>
+
+  <div class="video-info">
+    <strong>Source concept:</strong> <a href="https://youtu.be/B18zBnjZKmc" target="_blank" rel="noopener">Kilbright's Code - LLM Inference Engine Loading & Quantization</a>
+    <p class="meta">Generated 2026-04-26 | 4 visualizations extracted from transcript, then packaged with the live Strix Halo setup notes.</p>
+  </div>
+
+  <div class="setup-info">
+    <h2>Live Setup Snapshot</h2>
+    <p>Captured 2026-04-26 22:34 CDT. Screencast framing: Qwen3.6-35B-A3B serving roughly 25 tok/s over a 151k+ token working set at under 100W.</p>
+    <div class="setup-grid">
+      <div class="setup-stat"><span>Host</span><strong>artemis - Minisforum MS-S1 MAX</strong></div>
+      <div class="setup-stat"><span>APU</span><strong>Ryzen AI Max+ 395, Radeon 8060S</strong></div>
+      <div class="setup-stat"><span>Memory</span><strong>128GB LPDDR5X unified</strong></div>
+      <div class="setup-stat"><span>Backend</span><strong>llama.cpp b8890, Vulkan RADV</strong></div>
+      <div class="setup-stat"><span>Model</span><strong>Qwen3.6-35B-A3B UD-Q8_K_XL</strong></div>
+      <div class="setup-stat"><span>Observed</span><strong>153,562 max tokens, 24.1 tok/s generation</strong></div>
+    </div>
+    <pre><code>llama-server -ngl 999 -fa on --no-mmap -t 16 -tb 32 \
+  -m Qwen3.6-35B-A3B-UD-Q8_K_XL.gguf \
+  -c 524288 -np 3 --kv-unified \
+  --cache-type-k q8_0 --cache-type-v q8_0 \
+  -b 4096 -ub 4096 --cache-ram 16384 \
+  --cache-idle-slots --slot-prompt-similarity 0.8 \
+  --mlock --reasoning on --reasoning-budget 65536</code></pre>
+  </div>
+
+  <div class="setup-info">
+    <h2>Screencast</h2>
+    <p>The recording shows the live llama-swap activity view, GPU power draw, and terminal output while the Strix Halo node serves the long-context run.</p>
+    <video class="screencast-video" controls preload="metadata" poster="strix-halo-llm-inference-screencast-poster.jpg">
+      <source src="https://assets.kmarble.dev/artifacts/strix-halo-llm-inference-loading/strix-halo-llm-inference-screencast-2026-04-26.webm" type="video/webm">
+      <a href="https://assets.kmarble.dev/artifacts/strix-halo-llm-inference-loading/strix-halo-llm-inference-screencast-2026-04-26.webm">Open the screencast</a>
+    </video>
+  </div>
+
+  <div class="sketch">
+    <div class="sketch-header">
+      <h2>1. Memory Hierarchy — Eager vs Lazy Loading</h2>
+      <p>SSD → RAM → GPU model loading pipeline. Watch the difference between loading all weights at once vs loading on-demand via memory mapping.</p>
+      <span class="timestamp">Video timestamp: 0:50 – 5:10</span>
+    </div>
+    <iframe class="sketch-embed" src="memory-hierarchy.html" data-sketch-source="memory-hierarchy-source" loading="lazy"></iframe>
+    <div class="sketch-footer">
+      <span class="key-hints">Press <kbd>Space</kbd> to toggle eager/lazy | <kbd>R</kbd> randomize | <kbd>S</kbd> save PNG</span>
+    </div>
+  </div>
+
+  <div class="sketch">
+    <div class="sketch-header">
+      <h2>2. Quantization — Symmetric vs Asymmetric</h2>
+      <p>How BF16 weights are compressed to int4. Compare single-scale symmetric quantization against per-group asymmetric scaling with separate min/max.</p>
+      <span class="timestamp">Video timestamp: 6:40 – 10:03</span>
+    </div>
+    <iframe class="sketch-embed" src="quantization-comparison.html" data-sketch-source="quantization-comparison-source" loading="lazy"></iframe>
+    <div class="sketch-footer">
+      <span class="key-hints">Press <kbd>Space</kbd> to cycle phases | <kbd>S</kbd> save PNG</span>
+    </div>
+  </div>
+
+  <div class="sketch">
+    <div class="sketch-header">
+      <h2>3. K-Quants — Hierarchical Scaling + Mixed Precision</h2>
+      <p>256 weights organized into 8 groups of 32. Some groups use 4-bit (16 levels), others use 6-bit (64 levels). Hierarchical scaling preserves local outliers.</p>
+      <span class="timestamp">Video timestamp: 10:13 – 11:44</span>
+    </div>
+    <iframe class="sketch-embed" src="kquants-hierarchy.html" data-sketch-source="kquants-hierarchy-source" loading="lazy"></iframe>
+    <div class="sketch-footer">
+      <span class="key-hints"><kbd>S</kbd> save PNG</span>
+    </div>
+  </div>
+
+  <div class="sketch">
+    <div class="sketch-header">
+      <h2>4. Salient Weight Detection (AWQ / EXL2)</h2>
+      <p>Find the most important weights by activation magnitude. These salient weights are protected with higher precision during quantization to preserve model quality.</p>
+      <span class="timestamp">Video timestamp: 11:51 – 13:43</span>
+    </div>
+    <iframe class="sketch-embed" src="salient-weights.html" data-sketch-source="salient-weights-source" loading="lazy"></iframe>
+    <div class="sketch-footer">
+      <span class="key-hints">Press <kbd>Space</kbd> to cycle phases | <kbd>R</kbd> randomize | <kbd>S</kbd> save PNG</span>
+    </div>
+  </div>
+</div>
+<div class="portable-sketch-sources" hidden>
+<textarea id="memory-hierarchy-source" hidden>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Memory Hierarchy — Lazy Loading</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
+  <script>p5.disableFriendlyErrors = true;</script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #0a0a1a; }
+    body { min-height: 100vh; display: grid; place-items: center; }
+    canvas { display: block; max-width: 100vw; max-height: 100vh; width: auto !important; height: auto !important; }
+  </style>
+</head>
+<body>
+<script>
+const CONFIG = {
+  seed: 42,
+  layers: [
+    { name: 'SSD', y: 0, color: [200, 80, 60], speed: 1, capacity: 100, loaded: 0 },
+    { name: 'RAM', y: 1, color: [60, 120, 200], speed: 3, capacity: 50, loaded: 0 },
+    { name: 'GPU', y: 2, color: [60, 200, 100], speed: 10, capacity: 20, loaded: 0 },
+  ],
+  transferSpeeds: [
+    { from: 0, to: 1, speed: 2 },   // SSD→RAM: PCIe ~7GB/s
+    { from: 1, to: 2, speed: 8 },   // RAM→GPU: PCIe ~16GB/s
+  ],
+  batchSize: 3,
+};
+
+let blocks = [];
+let particles = [];
+let phase = 0; // 0=eager, 1=lazy
+let phaseTimer = 0;
+let labels = [];
+
+function setup() {
+  createCanvas(1200, 700);
+  randomSeed(CONFIG.seed);
+  noiseSeed(CONFIG.seed);
+  colorMode(HSB, 360, 100, 100, 100);
+
+  // Create weight blocks in SSD
+  for (let i = 0; i < CONFIG.layers[0].capacity; i++) {
+    blocks.push({
+      id: i,
+      layer: 0,
+      x: 0,
+      y: 0,
+      targetX: 0,
+      targetY: 0,
+      size: 18,
+      loaded: false,
+      inTransit: false,
+      transitProgress: 0,
+      fromLayer: 0,
+      toLayer: 0,
+      hue: map(i, 0, CONFIG.layers[0].capacity, 0, 30),
+    });
+  }
+
+  // Position blocks in SSD
+  let cols = 10;
+  for (let i = 0; i < blocks.length; i++) {
+    let col = i % cols;
+    let row = floor(i / cols);
+    blocks[i].x = 200 + col * 40;
+    blocks[i].y = CONFIG.layers[0].y * 180 + 30 + row * 25;
+    blocks[i].targetX = blocks[i].x;
+    blocks[i].targetY = blocks[i].y;
+  }
+
+  phase = 0;
+  phaseTimer = 0;
+}
+
+function draw() {
+  // Background with subtle gradient
+  for (let y = 0; y < height; y++) {
+    let inter = map(y, 0, height, 0, 1);
+    let c = lerpColor(color(240, 30, 8), color(240, 40, 4), inter);
+    stroke(c);
+    line(0, y, width, y);
+  }
+
+  phaseTimer += deltaTime / 1000;
+  if (phaseTimer > 5) {
+    phase = 1 - phase;
+    phaseTimer = 0;
+    resetForPhase();
+  }
+
+  // Draw layer labels
+  drawLayerLabels();
+
+  // Draw layer backgrounds
+  drawLayerBackgrounds();
+
+  // Update and draw blocks
+  updateBlocks();
+  drawBlocks();
+
+  // Draw transfer particles
+  updateParticles();
+  drawParticles();
+
+  // Draw phase indicator
+  drawPhaseIndicator();
+
+  // Draw legend
+  drawLegend();
+}
+
+function resetForPhase() {
+  for (let b of blocks) {
+    b.layer = 0;
+    b.loaded = false;
+    b.inTransit = false;
+    b.transitProgress = 0;
+    b.x = 200 + (b.id % 10) * 40;
+    b.y = CONFIG.layers[0].y * 180 + 30 + floor(b.id / 10) * 25;
+  }
+  blocks[0].layer = 0;
+  blocks[0].loaded = true;
+  blocks[0].inTransit = true;
+  blocks[0].transitProgress = 0;
+  blocks[0].fromLayer = 0;
+  blocks[0].toLayer = 1;
+}
+
+function drawLayerLabels() {
+  push();
+  textSize(18);
+  textStyle(BOLD);
+  textAlign(LEFT, CENTER);
+
+  for (let i = 0; i < CONFIG.layers.length; i++) {
+    let layer = CONFIG.layers[i];
+    let y = layer.y * 180 + 90;
+    fill(0, 0, 95);
+    noStroke();
+    text(layer.name, 30, y);
+  }
+  pop();
+}
+
+function drawLayerBackgrounds() {
+  for (let i = 0; i < CONFIG.layers.length; i++) {
+    let layer = CONFIG.layers[i];
+    let c = color(layer.color[0], layer.color[1], layer.color[2], 15);
+    fill(c);
+    noStroke();
+    rect(150, i * 180 - 30, 900, 170, 8);
+  }
+}
+
+function updateBlocks() {
+  for (let b of blocks) {
+    // Smooth movement
+    b.x = lerp(b.x, b.targetX, 0.08);
+    b.y = lerp(b.y, b.targetY, 0.08);
+
+    // Handle transit
+    if (b.inTransit) {
+      b.transitProgress += 0.015;
+      if (b.transitProgress >= 1) {
+        b.inTransit = false;
+        b.transitProgress = 0;
+        b.layer = b.toLayer;
+        b.loaded = true;
+
+        // Position in target layer
+        let cols = 10;
+        let col = b.id % cols;
+        let row = floor(b.id / cols);
+        b.targetX = 200 + col * 40;
+        b.targetY = CONFIG.layers[b.toLayer].y * 180 + 30 + row * 25;
+
+        // Trigger next block in transit (lazy loading simulation)
+        if (phase === 1) {
+          triggerNextLazy(b);
+        }
+      } else {
+        // Interpolate position during transit
+        let fromY = CONFIG.layers[b.fromLayer].y * 180 + 90;
+        let toY = CONFIG.layers[b.toLayer].y * 180 + 90;
+        b.y = lerp(fromY, toY, b.transitProgress);
+        b.x = lerp(b.x, 600, b.transitProgress); // Move to center during transit
+      }
+    }
+  }
+
+  // Eager loading: load first batch quickly
+  if (phase === 0) {
+    loadNextEager();
+  }
+}
+
+function triggerNextLazy(currentBlock) {
+  // Find next unloaded block
+  for (let b of blocks) {
+    if (!b.loaded && !b.inTransit && b.id > currentBlock.id) {
+      b.inTransit = true;
+      b.transitProgress = 0;
+      b.fromLayer = 0;
+      b.toLayer = 1;
+      break;
+    }
+  }
+}
+
+function loadNextEager() {
+  // Load first 8 blocks eagerly
+  if (blocks[0].loaded && blocks[0].layer >= 1 && !blocks[1].inTransit) {
+    blocks[1].inTransit = true;
+    blocks[1].transitProgress = 0;
+    blocks[1].fromLayer = 0;
+    blocks[1].toLayer = 1;
+  }
+  if (blocks[1].loaded && blocks[1].layer >= 1 && !blocks[2].inTransit) {
+    blocks[2].inTransit = true;
+    blocks[2].transitProgress = 0;
+    blocks[2].fromLayer = 0;
+    blocks[2].toLayer = 1;
+  }
+  if (blocks[2].loaded && blocks[2].layer >= 1 && !blocks[3].inTransit) {
+    blocks[3].inTransit = true;
+    blocks[3].transitProgress = 0;
+    blocks[3].fromLayer = 0;
+    blocks[3].toLayer = 1;
+  }
+}
+
+function drawBlocks() {
+  for (let b of blocks) {
+    if (b.layer < 0) continue;
+
+    let c = color(220 + b.hue, 70, 85, b.loaded ? 90 : 40);
+    fill(c);
+
+    if (b.inTransit) {
+      // Glow effect for in-transit blocks
+      noStroke();
+      fill(220 + b.hue, 90, 95, 30);
+      ellipse(b.x, b.y, b.size + 12, b.size + 12);
+      fill(220 + b.hue, 70, 85, 90);
+    } else if (b.loaded) {
+      stroke(0, 0, 100, 60);
+      strokeWeight(1);
+    } else {
+      noStroke();
+    }
+
+    rect(b.x - b.size/2, b.y - b.size/2, b.size, b.size, 3);
+  }
+}
+
+function updateParticles() {
+  // Spawn particles for in-transit blocks
+  for (let b of blocks) {
+    if (b.inTransit && random() < 0.3) {
+      particles.push({
+        x: b.x,
+        y: b.y,
+        vx: random(-1, 1),
+        vy: random(-0.5, 0.5),
+        life: 1,
+        hue: b.hue,
+      });
+    }
+  }
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    let p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 0.03;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  for (let p of particles) {
+    noStroke();
+    fill(220 + p.hue, 80, 90, p.life * 60);
+    ellipse(p.x, p.y, 4, 4);
+  }
+}
+
+function drawPhaseIndicator() {
+  push();
+  textSize(24);
+  textStyle(BOLD);
+  textAlign(CENTER, TOP);
+
+  let phaseText = phase === 0 ? 'EAGER LOADING' : 'LAZY LOADING (mMAP)';
+  let phaseColor = phase === 0 ? color(200, 80, 85) : color(120, 80, 85);
+
+  fill(phaseColor);
+  noStroke();
+  text(phaseText, width/2, 20);
+
+  let desc = phase === 0
+    ? 'Load all weights into RAM at once — simple but memory-intensive'
+    : 'Load weights on-demand via OS memory mapping — efficient but with page fault latency';
+
+  textSize(14);
+  textStyle(NORMAL);
+  fill(0, 0, 70);
+  text(desc, width/2, 52);
+  pop();
+}
+
+function drawLegend() {
+  push();
+  textSize(12);
+  textAlign(LEFT, TOP);
+
+  let x = 20;
+  let y = height - 60;
+
+  fill(0, 0, 90);
+  text('SSD (15GB model weights)', x, y);
+  fill(200, 80, 85);
+  rect(x + 10, y + 15, 12, 12);
+
+  fill(0, 0, 90);
+  text('RAM (32GB system memory)', x, y + 30);
+  fill(60, 80, 85);
+  rect(x + 10, y + 45, 12, 12);
+
+  fill(0, 0, 90);
+  text('GPU (compute accelerator)', x + 200, y);
+  fill(60, 80, 85);
+  rect(x + 210, y + 15, 12, 12);
+
+  fill(0, 0, 90);
+  text('In-transit weight block', x + 200, y + 30);
+  noStroke();
+  fill(220, 70, 85, 90);
+  rect(x + 210, y + 45, 12, 12);
+
+  pop();
+}
+
+function keyPressed() {
+  if (key === 's' || key === 'S') saveCanvas('memory-hierarchy', 'png');
+  if (key === 'r' || key === 'R') { randomSeed(millis()); noiseSeed(millis()); }
+  if (key === ' ') phase = 1 - phase;
+}
+</script>
+</body>
+</html>
+</textarea>
+<textarea id="quantization-comparison-source" hidden>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quantization: Symmetric vs Asymmetric</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
+  <script>p5.disableFriendlyErrors = true;</script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #0a0a1a; }
+    body { min-height: 100vh; display: grid; place-items: center; }
+    canvas { display: block; max-width: 100vw; max-height: 100vh; width: auto !important; height: auto !important; }
+  </style>
+</head>
+<body>
+<script>
+const CONFIG = {
+  seed: 42,
+  // Simulated BF16 weight values
+  weights: [0.91, 1.31, 6.34, 3.32, 5.40, 4.12, 2.87, 0.45, 5.91, 1.78,
+            3.56, 6.12, 0.78, 4.89, 2.34, 5.67, 1.23, 6.50, 3.01, 0.33],
+  int4Range: [-8, 7],  // int4 signed range
+};
+
+let animatedWeights = [];
+let targetWeights = [];
+let quantized = [];
+let phase = 0; // 0=show raw, 1=show symmetric, 2=show asymmetric
+let phaseTimer = 0;
+let errorDisplay = [];
+
+function setup() {
+  createCanvas(1200, 700);
+  randomSeed(CONFIG.seed);
+  noiseSeed(CONFIG.seed);
+  colorMode(HSB, 360, 100, 100, 100);
+
+  targetWeights = [...CONFIG.weights];
+  animatedWeights = CONFIG.weights.map(() => 0);
+  phase = 0;
+  phaseTimer = 0;
+}
+
+function draw() {
+  // Background
+  for (let y = 0; y < height; y++) {
+    let inter = map(y, 0, height, 0, 1);
+    let c = lerpColor(color(240, 30, 8), color(240, 40, 4), inter);
+    stroke(c);
+    line(0, y, width, 0, width, y);
+  }
+
+  phaseTimer += deltaTime / 1000;
+  if (phaseTimer > 4) {
+    phase = (phase + 1) % 3;
+    phaseTimer = 0;
+  }
+
+  // Animate weights appearing
+  for (let i = 0; i < animatedWeights.length; i++) {
+    animatedWeights[i] = lerp(animatedWeights[i], targetWeights[i], 0.05);
+  }
+
+  // Draw title
+  drawTitle();
+
+  // Draw phase-specific content
+  if (phase === 0) drawRawWeights();
+  else if (phase === 1) drawSymmetricQuant();
+  else drawAsymmetricQuant();
+
+  // Draw error bars
+  drawErrorBars();
+}
+
+function drawTitle() {
+  push();
+  textSize(22);
+  textStyle(BOLD);
+  textAlign(CENTER, TOP);
+
+  let titles = ['BF16 Weights (Original)', 'Symmetric Quantization', 'Asymmetric Quantization'];
+  let colors = [
+    color(200, 80, 85),
+    color(120, 80, 85),
+    color(280, 80, 85),
+  ];
+
+  fill(colors[phase]);
+  noStroke();
+  text(titles[phase], width/2, 20);
+
+  let descs = [
+    '32-bit floating point — full precision, 15GB for a typical model',
+    'Single scale factor for entire group — fast but loses detail',
+    'Separate min/max scale — preserves outliers better',
+  ];
+
+  textSize(13);
+  textStyle(NORMAL);
+  fill(0, 0, 65);
+  text(descs[phase], width/2, 50);
+  pop();
+}
+
+function drawRawWeights() {
+  push();
+  textSize(14);
+  textStyle(BOLD);
+  textAlign(CENTER, TOP);
+  fill(0, 0, 90);
+  text('Original BF16 Values (20 weights)', width/2, 80);
+
+  let barWidth = 40;
+  let startX = 100;
+  let maxVal = 7;
+
+  for (let i = 0; i < targetWeights.length; i++) {
+    let x = startX + i * 55;
+    let h = map(animatedWeights[i], 0, maxVal, 0, 200);
+    let y = 500 - h;
+
+    let c = color(200 + map(animatedWeights[i], 0, maxVal, 0, 30), 70, 80);
+    fill(c);
+    noStroke();
+    rect(x, y, barWidth, h, 3);
+
+    // Value label
+    textSize(10);
+    textStyle(NORMAL);
+    fill(0, 0, 90);
+    text(animatedWeights[i].toFixed(2), x + barWidth/2, y - 15);
+  }
+  pop();
+}
+
+function drawSymmetricQuant() {
+  push();
+  textSize(14);
+  textStyle(BOLD);
+  textAlign(CENTER, TOP);
+  fill(0, 0, 90);
+  text('Symmetric: Scale based on max absolute value', width/2, 80);
+
+  // Find range (symmetric uses max of abs values)
+  let maxAbs = 0;
+  for (let w of targetWeights) {
+    maxAbs = max(maxAbs, abs(w));
+  }
+  let scale = maxAbs / CONFIG.int4Range[1]; // 6.50 / 7 ≈ 0.929
+
+  let barWidth = 40;
+  let startX = 100;
+
+  for (let i = 0; i < targetWeights.length; i++) {
+    let x = startX + i * 55;
+    let raw = animatedWeights[i];
+    let quantized = round(raw / scale);
+    quantized = constrain(quantized, CONFIG.int4Range[0], CONFIG.int4Range[1]);
+    let dequantized = quantized * scale;
+
+    let h = map(abs(dequantized), 0, CONFIG.int4Range[1], 0, 200);
+    let y = 500 - h;
+
+    // Color based on quantized value
+    let c = color(120 + map(quantized, -8, 7, 0, 60), 70, 80);
+    fill(c);
+    noStroke();
+    rect(x, y, barWidth, h, 3);
+
+    // Show quantized value
+    textSize(10);
+    textStyle(NORMAL);
+    fill(0, 0, 90);
+    text(`q=${quantized}`, x + barWidth/2, y - 15);
+
+    // Show dequantized error
+    let error = abs(raw - dequantized);
+    if (error > 0.1) {
+      fill(0, 90, 90);
+      textSize(9);
+      text(`±${error.toFixed(2)}`, x + barWidth/2, y - 28);
+    }
+  }
+
+  // Show scale factor
+  textSize(12);
+  textStyle(BOLD);
+  fill(120, 80, 85);
+  text(`Scale factor: ${scale.toFixed(4)} (max/${CONFIG.int4Range[1]})`, width/2, 540);
+  pop();
+}
+
+function drawAsymmetricQuant() {
+  push();
+  textSize(14);
+  textStyle(BOLD);
+  textAlign(CENTER, TOP);
+  fill(0, 0, 90);
+  text('Asymmetric: Separate min and max scales', width/2, 80);
+
+  // Find range (asymmetric uses actual min/max)
+  let minVal = Infinity, maxVal = -Infinity;
+  for (let w of targetWeights) {
+    minVal = min(minVal, w);
+    maxVal = max(maxVal, w);
+  }
+  let range = maxVal - minVal;
+  let int4Range = CONFIG.int4Range[1] - CONFIG.int4Range[0]; // 7 - (-8) = 15
+  let scale = range / int4Range; // (6.50 - 0.33) / 15 ≈ 0.411
+
+  let barWidth = 40;
+  let startX = 100;
+
+  for (let i = 0; i < targetWeights.length; i++) {
+    let x = startX + i * 55;
+    let raw = animatedWeights[i];
+    let quantized = round((raw - minVal) / scale) + CONFIG.int4Range[0];
+    quantized = constrain(quantized, CONFIG.int4Range[0], CONFIG.int4Range[1]);
+    let dequantized = quantized * scale + minVal;
+
+    let h = map(abs(dequantized), 0, CONFIG.int4Range[1], 0, 200);
+    let y = 500 - h;
+
+    // Color based on quantized value
+    let c = color(280 + map(quantized, -8, 7, 0, 60), 70, 80);
+    fill(c);
+    noStroke();
+    rect(x, y, barWidth, h, 3);
+
+    // Show quantized value
+    textSize(10);
+    textStyle(NORMAL);
+    fill(0, 0, 90);
+    text(`q=${quantized}`, x + barWidth/2, y - 15);
+
+    // Show dequantized error
+    let error = abs(raw - dequantized);
+    if (error > 0.1) {
+      fill(0, 90, 90);
+      textSize(9);
+      text(`±${error.toFixed(2)}`, x + barWidth/2, y - 28);
+    }
+  }
+
+  // Show scale and offset
+  textSize(12);
+  textStyle(BOLD);
+  fill(280, 80, 85);
+  text(`Scale: ${scale.toFixed(4)} | Offset: ${minVal.toFixed(2)}`, width/2, 540);
+  pop();
+}
+
+function drawErrorBars() {
+  push();
+  textSize(12);
+  textStyle(BOLD);
+  textAlign(CENTER, BOTTOM);
+
+  if (phase > 0) {
+    // Calculate total error
+    let totalError = 0;
+    let count = 0;
+
+    if (phase === 1) {
+      let maxAbs = 0;
+      for (let w of targetWeights) maxAbs = max(maxAbs, abs(w));
+      let scale = maxAbs / CONFIG.int4Range[1];
+      for (let w of targetWeights) {
+        let q = constrain(round(w / scale), CONFIG.int4Range[0], CONFIG.int4Range[1]);
+        totalError += abs(w - q * scale);
+        count++;
+      }
+    } else {
+      let minVal = Infinity, maxVal = -Infinity;
+      for (let w of targetWeights) { minVal = min(minVal, w); maxVal = max(maxVal, w); }
+      let range = maxVal - minVal;
+      let int4Range = CONFIG.int4Range[1] - CONFIG.int4Range[0];
+      let scale = range / int4Range;
+      for (let w of targetWeights) {
+        let q = constrain(round((w - minVal) / scale) + CONFIG.int4Range[0], CONFIG.int4Range[0], CONFIG.int4Range[1]);
+        totalError += abs(w - (q * scale + minVal));
+        count++;
+      }
+    }
+
+    let avgError = count > 0 ? totalError / count : 0;
+    fill(0, 0, 90);
+    text(`Average quantization error: ${avgError.toFixed(4)}`, width/2, height - 15);
+  }
+  pop();
+}
+
+function keyPressed() {
+  if (key === 's' || key === 'S') saveCanvas('quantization-comparison', 'png');
+  if (key === 'r' || key === 'R') { randomSeed(millis()); noiseSeed(millis()); }
+  if (key === ' ') phase = (phase + 1) % 3;
+}
+</script>
+</body>
+</html>
+</textarea>
+<textarea id="kquants-hierarchy-source" hidden>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>K-Quants: Hierarchical Scaling</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
+  <script>p5.disableFriendlyErrors = true;</script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #0a0a1a; }
+    body { min-height: 100vh; display: grid; place-items: center; }
+    canvas { display: block; max-width: 100vw; max-height: 100vh; width: auto !important; height: auto !important; }
+  </style>
+</head>
+<body>
+<script>
+const CONFIG = {
+  seed: 42,
+  totalWeights: 256,
+  groupsPerBlock: 8,
+  weightsPerGroup: 32,
+  // Mixed precision: some groups at 4-bit, some at 6-bit
+  precisionMap: [],
+};
+
+let weights = [];
+let groups = [];
+let selectedGroup = -1;
+let animProgress = 0;
+let phase = 0;
+
+function setup() {
+  createCanvas(1200, 700);
+  randomSeed(CONFIG.seed);
+  noiseSeed(CONFIG.seed);
+  colorMode(HSB, 360, 100, 100, 100);
+
+  // Generate random weight values
+  for (let i = 0; i < CONFIG.totalWeights; i++) {
+    weights.push({
+      value: random(-1, 1),
+      id: i,
+      group: floor(i / CONFIG.weightsPerGroup),
+      idx: i % CONFIG.weightsPerGroup,
+      hue: map(i, 0, CONFIG.totalWeights, 0, 360),
+    });
+  }
+
+  // Create groups with mixed precision
+  for (let g = 0; g < CONFIG.groupsPerBlock; g++) {
+    let precision = (g % 3 === 0) ? 4 : 6; // Every 3rd group at 4-bit, rest at 6-bit
+    groups.push({
+      index: g,
+      precision: precision,
+      weights: weights.filter(w => w.group === g),
+      scale: random(0.5, 1.5),
+      bias: random(-0.2, 0.2),
+      selected: false,
+    });
+  }
+
+  phase = 0;
+}
+
+function draw() {
+  // Background
+  for (let y = 0; y < height; y++) {
+    let inter = map(y, 0, height, 0, 1);
+    let c = lerpColor(color(240, 30, 8), color(240, 40, 4), inter);
+    stroke(c);
+    line(0, y, width, y);
+  }
+
+  drawTitle();
+  drawHierarchy();
+  drawGroupDetail();
+  drawLegend();
+}
+
+function drawTitle() {
+  push();
+  textSize(22);
+  textStyle(BOLD);
+  textAlign(CENTER, TOP);
+  fill(0, 0, 90);
+  noStroke();
+  text('K-Quants: Hierarchical Scaling + Mixed Precision', width/2, 20);
+
+  textSize(13);
+  textStyle(NORMAL);
+  fill(0, 0, 60);
+  text('256 weights → 8 groups of 32 | 4-bit and 6-bit precision per group', width/2, 50);
+  pop();
+}
+
+function drawHierarchy() {
+  push();
+
+  // Draw top-level block
+  let blockX = 50;
+  let blockY = 80;
+  let blockW = 1100;
+  let blockH = 500;
+
+  // Block background
+  fill(0, 0, 15);
+  noStroke();
+  rect(blockX, blockY, blockW, blockH, 12);
+
+  // Draw groups as horizontal strips
+  let groupH = blockH / CONFIG.groupsPerBlock;
+
+  for (let g = 0; g < CONFIG.groupsPerBlock; g++) {
+    let group = groups[g];
+    let y = blockY + 10 + g * groupH;
+    let h = groupH - 10;
+
+    // Group background
+    let groupColor = group.precision === 4 ? color(120, 70, 70) : color(280, 70, 70);
+    fill(groupColor);
+    noStroke();
+    rect(blockX + 5, y, blockW - 10, h, 6);
+
+    // Draw weight bars within group
+    let barW = (blockW - 30) / CONFIG.weightsPerGroup;
+    for (let w = 0; w < group.weights.length; w++) {
+      let weight = group.weights[w];
+      let x = blockX + 15 + w * barW;
+      let barH = map(abs(weight.value), 0, 1, 0, h - 10);
+      let barY = y + h/2 - barH/2;
+
+      let c = color(weight.hue, 60, 80);
+      fill(c);
+      noStroke();
+      rect(x, barY, barW - 2, barH, 2);
+    }
+
+    // Group label
+    textSize(11);
+    textStyle(BOLD);
+    textAlign(LEFT, CENTER);
+    fill(0, 0, 95);
+    text(`Group ${g} (${group.precision}-bit)`, blockX + 10, y + 12);
+
+    // Scale factor label
+    textSize(10);
+    textStyle(NORMAL);
+    fill(0, 0, 70);
+    text(`scale=${group.scale.toFixed(2)}`, blockX + blockW - 120, y + 12);
+  }
+
+  pop();
+}
+
+function drawGroupDetail() {
+  push();
+
+  let detailX = 50;
+  let detailY = 600;
+  let detailW = 1100;
+  let detailH = 80;
+
+  // Detail panel
+  fill(0, 0, 20);
+  noStroke();
+  rect(detailX, detailY, detailW, detailH, 8);
+
+  textSize(12);
+  textStyle(BOLD);
+  textAlign(LEFT, TOP);
+  fill(0, 0, 90);
+  text('How it works: Each group has its own scale factor. Mixed precision means some groups use 4-bit (16 levels), others use 6-bit (64 levels).', detailX + 10, detailY + 10);
+
+  textSize(11);
+  textStyle(NORMAL);
+  fill(0, 0, 65);
+  text('This hierarchical approach preserves local outliers that would be lost with a single global scale factor.', detailX + 10, detailY + 30);
+  text('KQ4_S: all groups at 4-bit | KQ4_M: output and gate at 6-bit, rest at 4-bit', detailX + 10, detailY + 50);
+
+  pop();
+}
+
+function drawLegend() {
+  push();
+  textSize(11);
+  textStyle(BOLD);
+  textAlign(RIGHT, TOP);
+  fill(120, 70, 80);
+  text('4-bit group (16 levels)', width - 50, 30);
+  fill(280, 70, 80);
+  text('6-bit group (64 levels)', width - 50, 48);
+  pop();
+}
+
+function keyPressed() {
+  if (key === 's' || key === 'S') saveCanvas('kquants-hierarchy', 'png');
+  if (key === 'r' || key === 'R') { randomSeed(millis()); noiseSeed(millis()); }
+}
+</script>
+</body>
+</html>
+</textarea>
+<textarea id="salient-weights-source" hidden>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SALient Weight Detection — AWQ / EXL2</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
+  <script>p5.disableFriendlyErrors = true;</script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #0a0a1a; }
+    body { min-height: 100vh; display: grid; place-items: center; }
+    canvas { display: block; max-width: 100vw; max-height: 100vh; width: auto !important; height: auto !important; }
+  </style>
+</head>
+<body>
+<script>
+const CONFIG = {
+  seed: 42,
+  rows: 20,
+  cols: 40,
+  salientCount: 8,
+};
+
+let matrix = [];
+let salient = [];
+let phase = 0;
+let phaseTimer = 0;
+let pulsePhase = 0;
+
+function setup() {
+  createCanvas(1200, 700);
+  randomSeed(CONFIG.seed);
+  noiseSeed(CONFIG.seed);
+  colorMode(HSB, 360, 100, 100, 100);
+
+  // Generate weight matrix
+  for (let r = 0; r < CONFIG.rows; r++) {
+    matrix[r] = [];
+    for (let c = 0; c < CONFIG.cols; c++) {
+      matrix[r][c] = {
+        value: randomGaussian(0, 1),
+        magnitude: 0,
+        isSalient: false,
+        salientIndex: -1,
+      };
+    }
+  }
+
+  // Find salient weights by magnitude (AWQ approach)
+  let magnitudes = [];
+  for (let r = 0; r < CONFIG.rows; r++) {
+    for (let c = 0; c < CONFIG.cols; c++) {
+      magnitudes.push({ r, c, mag: abs(matrix[r][c].value) });
+    }
+  }
+  magnitudes.sort((a, b) => b.mag - a.mag);
+
+  for (let i = 0; i < CONFIG.salientCount; i++) {
+    matrix[magnitudes[i].r][magnitudes[i].c].isSalient = true;
+    matrix[magnitudes[i].r][magnitudes[i].c].salientIndex = i;
+  }
+
+  phase = 0;
+  phaseTimer = 0;
+}
+
+function draw() {
+  // Background
+  for (let y = 0; y < height; y++) {
+    let inter = map(y, 0, height, 0, 1);
+    let c = lerpColor(color(240, 30, 8), color(240, 40, 4), inter);
+    stroke(c);
+    line(0, y, width, y);
+  }
+
+  phaseTimer += deltaTime / 1000;
+  pulsePhase += 0.03;
+
+  if (phaseTimer > 5) {
+    phase = (phase + 1) % 3;
+    phaseTimer = 0;
+  }
+
+  drawTitle();
+  drawMatrix();
+  drawPhaseInfo();
+  drawLegend();
+}
+
+function drawTitle() {
+  push();
+  textSize(22);
+  textStyle(BOLD);
+  textAlign(CENTER, TOP);
+  fill(0, 0, 90);
+  noStroke();
+  text('Salient Weight Detection — AWQ / EXL2', width/2, 20);
+  textSize(13);
+  textStyle(NORMAL);
+  fill(0, 0, 60);
+  text('Find the most important weights by activation magnitude, protect them with higher precision', width/2, 50);
+  pop();
+}
+
+function drawMatrix() {
+  push();
+
+  let cellW = 22;
+  let cellH = 20;
+  let startX = 100;
+  let startY = 80;
+
+  for (let r = 0; r < CONFIG.rows; r++) {
+    for (let c = 0; c < CONFIG.cols; c++) {
+      let cell = matrix[r][c];
+      let x = startX + c * cellW;
+      let y = startY + r * cellH;
+
+      let brightness = map(abs(cell.value), 0, 3, 20, 90);
+      let hue = cell.isSalient ? 120 : map(cell.value, -3, 3, 200, 320);
+
+      if (cell.isSalient) {
+        // Pulsing effect for salient weights
+        let pulse = sin(pulsePhase + cell.salientIndex * 0.5) * 0.3 + 0.7;
+        fill(120, 80, 90 * pulse);
+        stroke(120, 90, 95);
+        strokeWeight(2);
+      } else {
+        fill(hue, 60, brightness);
+        noStroke();
+      }
+
+      rect(x, y, cellW - 1, cellH - 1, 2);
+    }
+  }
+
+  pop();
+}
+
+function drawPhaseInfo() {
+  push();
+  textSize(14);
+  textStyle(BOLD);
+  textAlign(CENTER, TOP);
+
+  let infoY = height - 120;
+
+  if (phase === 0) {
+    fill(200, 80, 85);
+    text('Phase 1: Forward pass with calibration data', width/2, infoY);
+    textSize(12);
+    textStyle(NORMAL);
+    fill(0, 0, 65);
+    text('Run training data through the model to measure activation magnitudes per weight', width/2, infoY + 20);
+  } else if (phase === 1) {
+    fill(120, 80, 85);
+    text('Phase 2: Identify salient weights (top 8 by magnitude)', width/2, infoY);
+    textSize(12);
+    textStyle(NORMAL);
+    fill(0, 0, 65);
+    text(`Found ${CONFIG.salientCount} salient weights — these have the biggest impact on output`, width/2, infoY + 20);
+  } else {
+    fill(280, 80, 85);
+    text('Phase 3: Mixed precision — salient at 6-bit, rest at 4-bit', width/2, infoY);
+    textSize(12);
+    textStyle(NORMAL);
+    fill(0, 0, 65);
+    text('Scale salient weights to reduce quantization error, preserving model quality', width/2, infoY + 20);
+  }
+  pop();
+}
+
+function drawLegend() {
+  push();
+  textSize(11);
+  textStyle(BOLD);
+  textAlign(LEFT, TOP);
+
+  let x = 100;
+  let y = height - 50;
+
+  fill(120, 80, 85);
+  rect(x, y, 12, 12);
+  fill(0, 0, 90);
+  text('Salient weight (protected)', x + 18, y + 3);
+
+  fill(200, 60, 60);
+  rect(x + 180, y, 12, 12);
+  fill(0, 0, 90);
+  text('Normal weight (4-bit)', x + 198, y + 3);
+
+  fill(280, 60, 60);
+  rect(x + 380, y, 12, 12);
+  fill(0, 0, 90);
+  text('Negative weight (4-bit)', x + 398, y + 3);
+
+  pop();
+}
+
+function keyPressed() {
+  if (key === 's' || key === 'S') saveCanvas('salient-weights', 'png');
+  if (key === 'r' || key === 'R') { randomSeed(millis()); noiseSeed(millis()); }
+  if (key === ' ') phase = (phase + 1) % 3;
+}
+</script>
+</body>
+</html>
+</textarea>
+</div>
+<script>
+  for (const frame of document.querySelectorAll('iframe[data-sketch-source]')) {
+    const source = document.getElementById(frame.dataset.sketchSource);
+    if (source) frame.srcdoc = source.value.trim();
+  }
+</script>
+</body>
+</html>

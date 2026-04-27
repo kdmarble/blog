@@ -18,3 +18,7 @@ Thumbs.db
 
 # Local overrides
 hugo_stats.json
+
+# Large media hosted on Cloudflare R2 (CF Pages enforces a 25 MiB per-file limit)
+static/artifacts/strix-halo-llm-inference-loading/strix-halo-llm-inference-screencast-2026-04-26.webm
+static/downloads/strix-halo-llm-inference-loading-2026-04-26.zip

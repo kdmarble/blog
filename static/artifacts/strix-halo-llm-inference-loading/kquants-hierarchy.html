@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>K-Quants: Hierarchical Scaling</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
+  <script>p5.disableFriendlyErrors = true;</script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #0a0a1a; }
+    body { min-height: 100vh; display: grid; place-items: center; }
+    canvas { display: block; max-width: 100vw; max-height: 100vh; width: auto !important; height: auto !important; }
+  </style>
+</head>
+<body>
+<script>
+const CONFIG = {
+  seed: 42,
+  totalWeights: 256,
+  groupsPerBlock: 8,
+  weightsPerGroup: 32,
+  // Mixed precision: some groups at 4-bit, some at 6-bit
+  precisionMap: [],
+};
+
+let weights = [];
+let groups = [];
+let selectedGroup = -1;
+let animProgress = 0;
+let phase = 0;
+
+function setup() {
+  createCanvas(1200, 700);
+  randomSeed(CONFIG.seed);
+  noiseSeed(CONFIG.seed);
+  colorMode(HSB, 360, 100, 100, 100);
+
+  // Generate random weight values
+  for (let i = 0; i < CONFIG.totalWeights; i++) {
+    weights.push({
+      value: random(-1, 1),
+      id: i,
+      group: floor(i / CONFIG.weightsPerGroup),
+      idx: i % CONFIG.weightsPerGroup,
+      hue: map(i, 0, CONFIG.totalWeights, 0, 360),
+    });
+  }
+
+  // Create groups with mixed precision
+  for (let g = 0; g < CONFIG.groupsPerBlock; g++) {
+    let precision = (g % 3 === 0) ? 4 : 6; // Every 3rd group at 4-bit, rest at 6-bit
+    groups.push({
+      index: g,
+      precision: precision,
+      weights: weights.filter(w => w.group === g),
+      scale: random(0.5, 1.5),
+      bias: random(-0.2, 0.2),
+      selected: false,
+    });
+  }
+
+  phase = 0;
+}
+
+function draw() {
+  // Background
+  for (let y = 0; y < height; y++) {
+    let inter = map(y, 0, height, 0, 1);
+    let c = lerpColor(color(240, 30, 8), color(240, 40, 4), inter);
+    stroke(c);
+    line(0, y, width, y);
+  }
+
+  drawTitle();
+  drawHierarchy();
+  drawGroupDetail();
+  drawLegend();
+}
+
+function drawTitle() {
+  push();
+  textSize(22);
+  textStyle(BOLD);
+  textAlign(CENTER, TOP);
+  fill(0, 0, 90);
+  noStroke();
+  text('K-Quants: Hierarchical Scaling + Mixed Precision', width/2, 20);
+
+  textSize(13);
+  textStyle(NORMAL);
+  fill(0, 0, 60);
+  text('256 weights → 8 groups of 32 | 4-bit and 6-bit precision per group', width/2, 50);
+  pop();
+}
+
+function drawHierarchy() {
+  push();
+
+  // Draw top-level block
+  let blockX = 50;
+  let blockY = 80;
+  let blockW = 1100;
+  let blockH = 500;
+
+  // Block background
+  fill(0, 0, 15);
+  noStroke();
+  rect(blockX, blockY, blockW, blockH, 12);
+
+  // Draw groups as horizontal strips
+  let groupH = blockH / CONFIG.groupsPerBlock;
+
+  for (let g = 0; g < CONFIG.groupsPerBlock; g++) {
+    let group = groups[g];
+    let y = blockY + 10 + g * groupH;
+    let h = groupH - 10;
+
+    // Group background
+    let groupColor = group.precision === 4 ? color(120, 70, 70) : color(280, 70, 70);
+    fill(groupColor);
+    noStroke();
+    rect(blockX + 5, y, blockW - 10, h, 6);
+
+    // Draw weight bars within group
+    let barW = (blockW - 30) / CONFIG.weightsPerGroup;
+    for (let w = 0; w < group.weights.length; w++) {
+      let weight = group.weights[w];
+      let x = blockX + 15 + w * barW;
+      let barH = map(abs(weight.value), 0, 1, 0, h - 10);
+      let barY = y + h/2 - barH/2;
+
+      let c = color(weight.hue, 60, 80);
+      fill(c);
+      noStroke();
+      rect(x, barY, barW - 2, barH, 2);
+    }
+
+    // Group label
+    textSize(11);
+    textStyle(BOLD);
+    textAlign(LEFT, CENTER);
+    fill(0, 0, 95);
+    text(`Group ${g} (${group.precision}-bit)`, blockX + 10, y + 12);
+
+    // Scale factor label
+    textSize(10);
+    textStyle(NORMAL);
+    fill(0, 0, 70);
+    text(`scale=${group.scale.toFixed(2)}`, blockX + blockW - 120, y + 12);
+  }
+
+  pop();
+}
+
+function drawGroupDetail() {
+  push();
+
+  let detailX = 50;
+  let detailY = 600;
+  let detailW = 1100;
+  let detailH = 80;
+
+  // Detail panel
+  fill(0, 0, 20);
+  noStroke();
+  rect(detailX, detailY, detailW, detailH, 8);
+
+  textSize(12);
+  textStyle(BOLD);
+  textAlign(LEFT, TOP);
+  fill(0, 0, 90);
+  text('How it works: Each group has its own scale factor. Mixed precision means some groups use 4-bit (16 levels), others use 6-bit (64 levels).', detailX + 10, detailY + 10);
+
+  textSize(11);
+  textStyle(NORMAL);
+  fill(0, 0, 65);
+  text('This hierarchical approach preserves local outliers that would be lost with a single global scale factor.', detailX + 10, detailY + 30);
+  text('KQ4_S: all groups at 4-bit | KQ4_M: output and gate at 6-bit, rest at 4-bit', detailX + 10, detailY + 50);
+
+  pop();
+}
+
+function drawLegend() {
+  push();
+  textSize(11);
+  textStyle(BOLD);
+  textAlign(RIGHT, TOP);
+  fill(120, 70, 80);
+  text('4-bit group (16 levels)', width - 50, 30);
+  fill(280, 70, 80);
+  text('6-bit group (64 levels)', width - 50, 48);
+  pop();
+}
+
+function keyPressed() {
+  if (key === 's' || key === 'S') saveCanvas('kquants-hierarchy', 'png');
+  if (key === 'r' || key === 'R') { randomSeed(millis()); noiseSeed(millis()); }
+}
+</script>
+</body>
+</html>

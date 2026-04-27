@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SALient Weight Detection — AWQ / EXL2</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
+  <script>p5.disableFriendlyErrors = true;</script>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #0a0a1a; }
+    body { min-height: 100vh; display: grid; place-items: center; }
+    canvas { display: block; max-width: 100vw; max-height: 100vh; width: auto !important; height: auto !important; }
+  </style>
+</head>
+<body>
+<script>
+const CONFIG = {
+  seed: 42,
+  rows: 20,
+  cols: 40,
+  salientCount: 8,
+};
+
+let matrix = [];
+let salient = [];
+let phase = 0;
+let phaseTimer = 0;
+let pulsePhase = 0;
+
+function setup() {
+  createCanvas(1200, 700);
+  randomSeed(CONFIG.seed);
+  noiseSeed(CONFIG.seed);
+  colorMode(HSB, 360, 100, 100, 100);
+
+  // Generate weight matrix
+  for (let r = 0; r < CONFIG.rows; r++) {
+    matrix[r] = [];
+    for (let c = 0; c < CONFIG.cols; c++) {
+      matrix[r][c] = {
+        value: randomGaussian(0, 1),
+        magnitude: 0,
+        isSalient: false,
+        salientIndex: -1,
+      };
+    }
+  }
+
+  // Find salient weights by magnitude (AWQ approach)
+  let magnitudes = [];
+  for (let r = 0; r < CONFIG.rows; r++) {
+    for (let c = 0; c < CONFIG.cols; c++) {
+      magnitudes.push({ r, c, mag: abs(matrix[r][c].value) });
+    }
+  }
+  magnitudes.sort((a, b) => b.mag - a.mag);
+
+  for (let i = 0; i < CONFIG.salientCount; i++) {
+    matrix[magnitudes[i].r][magnitudes[i].c].isSalient = true;
+    matrix[magnitudes[i].r][magnitudes[i].c].salientIndex = i;
+  }
+
+  phase = 0;
+  phaseTimer = 0;
+}
+
+function draw() {
+  // Background
+  for (let y = 0; y < height; y++) {
+    let inter = map(y, 0, height, 0, 1);
+    let c = lerpColor(color(240, 30, 8), color(240, 40, 4), inter);
+    stroke(c);
+    line(0, y, width, y);
+  }
+
+  phaseTimer += deltaTime / 1000;
+  pulsePhase += 0.03;
+
+  if (phaseTimer > 5) {
+    phase = (phase + 1) % 3;
+    phaseTimer = 0;
+  }
+
+  drawTitle();
+  drawMatrix();
+  drawPhaseInfo();
+  drawLegend();
+}
+
+function drawTitle() {
+  push();
+  textSize(22);
+  textStyle(BOLD);
+  textAlign(CENTER, TOP);
+  fill(0, 0, 90);
+  noStroke();
+  text('Salient Weight Detection — AWQ / EXL2', width/2, 20);
+  textSize(13);
+  textStyle(NORMAL);
+  fill(0, 0, 60);
+  text('Find the most important weights by activation magnitude, protect them with higher precision', width/2, 50);
+  pop();
+}
+
+function drawMatrix() {
+  push();
+
+  let cellW = 22;
+  let cellH = 20;
+  let startX = 100;
+  let startY = 80;
+
+  for (let r = 0; r < CONFIG.rows; r++) {
+    for (let c = 0; c < CONFIG.cols; c++) {
+      let cell = matrix[r][c];
+      let x = startX + c * cellW;
+      let y = startY + r * cellH;
+
+      let brightness = map(abs(cell.value), 0, 3, 20, 90);
+      let hue = cell.isSalient ? 120 : map(cell.value, -3, 3, 200, 320);
+
+      if (cell.isSalient) {
+        // Pulsing effect for salient weights
+        let pulse = sin(pulsePhase + cell.salientIndex * 0.5) * 0.3 + 0.7;
+        fill(120, 80, 90 * pulse);
+        stroke(120, 90, 95);
+        strokeWeight(2);
+      } else {
+        fill(hue, 60, brightness);
+        noStroke();
+      }
+
+      rect(x, y, cellW - 1, cellH - 1, 2);
+    }
+  }
+
+  pop();
+}
+
+function drawPhaseInfo() {
+  push();
+  textSize(14);
+  textStyle(BOLD);
+  textAlign(CENTER, TOP);
+
+  let infoY = height - 120;
+
+  if (phase === 0) {
+    fill(200, 80, 85);
+    text('Phase 1: Forward pass with calibration data', width/2, infoY);
+    textSize(12);
+    textStyle(NORMAL);
+    fill(0, 0, 65);
+    text('Run training data through the model to measure activation magnitudes per weight', width/2, infoY + 20);
+  } else if (phase === 1) {
+    fill(120, 80, 85);
+    text('Phase 2: Identify salient weights (top 8 by magnitude)', width/2, infoY);
+    textSize(12);
+    textStyle(NORMAL);
+    fill(0, 0, 65);
+    text(`Found ${CONFIG.salientCount} salient weights — these have the biggest impact on output`, width/2, infoY + 20);
+  } else {
+    fill(280, 80, 85);
+    text('Phase 3: Mixed precision — salient at 6-bit, rest at 4-bit', width/2, infoY);
+    textSize(12);
+    textStyle(NORMAL);
+    fill(0, 0, 65);
+    text('Scale salient weights to reduce quantization error, preserving model quality', width/2, infoY + 20);
+  }
+  pop();
+}
+
+function drawLegend() {
+  push();
+  textSize(11);
+  textStyle(BOLD);
+  textAlign(LEFT, TOP);
+
+  let x = 100;
+  let y = height - 50;
+
+  fill(120, 80, 85);
+  rect(x, y, 12, 12);
+  fill(0, 0, 90);
+  text('Salient weight (protected)', x + 18, y + 3);
+
+  fill(200, 60, 60);
+  rect(x + 180, y, 12, 12);
+  fill(0, 0, 90);
+  text('Normal weight (4-bit)', x + 198, y + 3);
+
+  fill(280, 60, 60);
+  rect(x + 380, y, 12, 12);
+  fill(0, 0, 90);
+  text('Negative weight (4-bit)', x + 398, y + 3);
+
+  pop();
+}
+
+function keyPressed() {
+  if (key === 's' || key === 'S') saveCanvas('salient-weights', 'png');
+  if (key === 'r' || key === 'R') { randomSeed(millis()); noiseSeed(millis()); }
+  if (key === ' ') phase = (phase + 1) % 3;
+}
+</script>
+</body>
+</html>
